@@ -1,3 +1,10 @@
+# Modifications for STM32
+This fork modifies wollewald's library for Invensense's ICM 20948 to be used with STM's STM32 HAL Library.
+The modified library is tested with an STM32G474 Nucleo Board, the IMU (mounted on an Adafruit breakoutboard)is connected to I2C1 via its QWIIC Connector.
+The project needs to be converted to a "C++ Project" and main.c needs to be converted to main.cpp.
+
+I will expand the library to support Interrupt and DMA functionality in future.
+
 # ICM20948_WE
 An Arduino library for the ICM-20948 9-axis accelerometer, gyroscope and magnetometer. It contains many example sketches with lots of comments to make it easy to use.
 

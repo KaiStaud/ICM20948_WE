@@ -18,9 +18,9 @@
 *********************************************************************/
 
 #include "ICM20948_WE.h"
-
+#include "math.h"
 /************  Constructors ************/
-
+/*
 ICM20948_WE::ICM20948_WE(int addr){
     _wire = &Wire;
     i2cAddress = addr;   
@@ -30,15 +30,15 @@ ICM20948_WE::ICM20948_WE(){
     _wire = &Wire;
     i2cAddress = 0x68;   
 }
-
-ICM20948_WE::ICM20948_WE(TwoWire *w, int addr){
+*/
+ICM20948_WE::ICM20948_WE(I2C_HandleTypeDef *w, int addr){
     _wire = w;
     i2cAddress = addr; 
 }
 
-ICM20948_WE::ICM20948_WE(TwoWire *w){
+ICM20948_WE::ICM20948_WE(I2C_HandleTypeDef *w){
     _wire = w;
-    i2cAddress = 0x68;
+    i2cAddress = 210;//0x68;
 }
 
 /************ Basic Settings ************/
@@ -79,7 +79,7 @@ void ICM20948_WE::autoOffsets(){
     setGyrRange(ICM20948_GYRO_RANGE_250); // highest resolution
     setAccRange(ICM20948_ACC_RANGE_2G);
     setAccDLPF(ICM20948_DLPF_6);
-    delay(100);
+    HAL_Delay(100);
     
     for(int i=0; i<50; i++){
         readSensor();
@@ -87,7 +87,7 @@ void ICM20948_WE::autoOffsets(){
         accOffsetVal.x += accRawVal.x;
         accOffsetVal.y += accRawVal.y;
         accOffsetVal.z += accRawVal.z;
-        delay(10);
+        HAL_Delay(10);
     }
     
     accOffsetVal.x /= 50;
@@ -101,7 +101,7 @@ void ICM20948_WE::autoOffsets(){
         gyrOffsetVal.x += gyrRawVal.x;
         gyrOffsetVal.y += gyrRawVal.y;
         gyrOffsetVal.z += gyrRawVal.z;
-        delay(1);
+        HAL_Delay(1);
     }
     
     gyrOffsetVal.x /= 50;
@@ -137,7 +137,7 @@ void ICM20948_WE::enableAcc(bool enAcc){
     else{
         regVal |= ICM20948_ACC_EN;
     }
-    writeRegister8(0, ICM20948_PWR_MGMT_2, regVal);
+    writeRegister8(0, ICM20948_PWR_MGMT_2, 0x00);//regVal);
 }
 
 void ICM20948_WE::setAccRange(ICM20948_accRange accRange){
@@ -270,7 +270,7 @@ xyzFloat ICM20948_WE::getGValuesFromFifo(){
 
 float ICM20948_WE::getResultantG(xyzFloat gVal){
     float resultant = 0.0;
-    resultant = sqrt(sq(gVal.x) + sq(gVal.y) + sq(gVal.z));
+     resultant = sqrt(pow(gVal.x,2) + pow(gVal.y,2) + pow(gVal.z,2));
     
     return resultant;
 }
@@ -439,9 +439,9 @@ ICM20948_orientation ICM20948_WE::getOrientation(){
     return orientation;
 }
 
-String ICM20948_WE::getOrientationAsString(){
+std::string ICM20948_WE::getOrientationAsString(){
     ICM20948_orientation orientation = getOrientation();
-    String orientationAsString = "";
+    std::string orientationAsString = "";
     switch(orientation){
         case ICM20948_FLAT:      orientationAsString = "z up";   break;
         case ICM20948_FLAT_1:    orientationAsString = "z down"; break;
@@ -736,7 +736,7 @@ int16_t ICM20948_WE::whoAmIMag(){
 
 void ICM20948_WE::setMagOpMode(AK09916_opMode opMode){
     writeAK09916Register8(AK09916_CNTL_2, opMode);
-    delay(10);
+    HAL_Delay(10);
     if(opMode!=AK09916_PWR_DOWN){
         enableMagDataRead(AK09916_HXL, 0x08);
     }
@@ -744,7 +744,7 @@ void ICM20948_WE::setMagOpMode(AK09916_opMode opMode){
 
 void ICM20948_WE::resetMag(){
     writeAK09916Register8(AK09916_CNTL_3, 0x01);
-    delay(100);
+    HAL_Delay(100);
 }
 
 
@@ -756,7 +756,7 @@ void ICM20948_WE::setClockToAutoSelect(){
     regVal = readRegister8(0, ICM20948_PWR_MGMT_1);
     regVal |= 0x01;
     writeRegister8(0, ICM20948_PWR_MGMT_1, regVal);
-    delay(10);
+    HAL_Delay(10);
 }
 
 xyzFloat ICM20948_WE::correctAccRawValues(xyzFloat accRawVal){
@@ -778,74 +778,52 @@ xyzFloat ICM20948_WE::correctGyrRawValues(xyzFloat gyrRawVal){
 void ICM20948_WE::switchBank(uint8_t newBank){
     if(newBank != currentBank){
         currentBank = newBank;
-        _wire->beginTransmission(i2cAddress);
-        _wire->write(ICM20948_REG_BANK_SEL);
-        _wire->write(currentBank<<4);
-        _wire->endTransmission();
+
+        std::uint8_t pData[2]={ICM20948_REG_BANK_SEL,currentBank<<4};
+        HAL_I2C_Master_Transmit(_wire, i2cAddress, pData, 2, 10);
     }
 }
 
 uint8_t ICM20948_WE::writeRegister8(uint8_t bank, uint8_t reg, uint8_t val){
     switchBank(bank);
-    _wire->beginTransmission(i2cAddress);
-    _wire->write(reg);
-    _wire->write(val);
-    
-    return _wire->endTransmission();
+    std::uint8_t pData[2]={reg,val};
+    return HAL_I2C_Master_Transmit(_wire, i2cAddress, pData, 2, 10);
 }
 
 uint8_t ICM20948_WE::writeRegister16(uint8_t bank, uint8_t reg, int16_t val){
     switchBank(bank);
     int8_t MSByte = (int8_t)((val>>8) & 0xFF);
     uint8_t LSByte = val & 0xFF;
-    _wire->beginTransmission(i2cAddress);
-    _wire->write(reg);
-    _wire->write(MSByte);
-    _wire->write(LSByte);
-    
-    return _wire->endTransmission();  
+    std::uint8_t pData[3]={reg,MSByte,LSByte};
+    return HAL_I2C_Master_Transmit(_wire, i2cAddress, pData, 3, 10);
 }
 
 uint8_t ICM20948_WE::readRegister8(uint8_t bank, uint8_t reg){
     switchBank(bank);
     uint8_t regValue = 0;
-    _wire->beginTransmission(i2cAddress);
-    _wire->write(reg);
-    _wire->endTransmission(false);
-    _wire->requestFrom(i2cAddress,1);
-    if(_wire->available()){
-        regValue = _wire->read();
-    }
+     HAL_I2C_Master_Transmit(_wire, i2cAddress, &reg, 2, 10);
+     HAL_I2C_Master_Receive(_wire, i2cAddress, &regValue, 1, 10);
     return regValue;
 }
 
 int16_t ICM20948_WE::readRegister16(uint8_t bank, uint8_t reg){
     switchBank(bank);
     uint8_t MSByte = 0, LSByte = 0;
-    int16_t reg16Val = 0;
-    _wire->beginTransmission(i2cAddress);
-    _wire->write(reg);
-    _wire->endTransmission(false);
-    _wire->requestFrom(i2cAddress,2);
-    if(_wire->available()){
-        MSByte = _wire->read();
-        LSByte = _wire->read();
-    }
-    reg16Val = (MSByte<<8) + LSByte;
-    return reg16Val;
+    int16_t reg16Val[2]={0,0};
+
+    HAL_I2C_Master_Transmit(_wire, i2cAddress, &reg, 2, 10);
+    HAL_I2C_Master_Receive(_wire, i2cAddress, &regVal, 2, 10);
+    MSByte = reg16Val[1];
+	MSByte = reg16Val[0];
+    return (MSByte<<8) + LSByte;
 }
 
 void ICM20948_WE::readAllData(uint8_t* data){    
     switchBank(0);
-    _wire->beginTransmission(i2cAddress);
-    _wire->write(ICM20948_ACCEL_OUT);
-    _wire->endTransmission(false);
-    _wire->requestFrom(i2cAddress,20);
-    if(_wire->available()){
-        for(int i=0; i<20; i++){
-            data[i] = _wire->read();
-        }
-    }
+    uint8_t x_acc_h = 0x2D;
+    HAL_I2C_Master_Transmit(_wire, i2cAddress, &x_acc_h, 1, 10);
+//    HAL_I2C_Master_Transmit(_wire, i2cAddress, ICM20948_ACCEL_OUT, 1, 10);
+    HAL_I2C_Master_Receive(_wire, i2cAddress, data, 20, 10);
 }
 
 xyzFloat ICM20948_WE::readICM20948xyzValFromFifo(){
@@ -887,20 +865,20 @@ int16_t ICM20948_WE::readAK09916Register16(uint8_t reg){
 
 uint8_t ICM20948_WE::reset_ICM20948(){
     uint8_t ack = writeRegister8(0, ICM20948_PWR_MGMT_1, ICM20948_RESET);
-    delay(10);  // wait for registers to reset
+    HAL_Delay(10);  // wait for registers to reset
     return (ack == 0);
 }
 
 void ICM20948_WE::enableI2CMaster(){
     writeRegister8(0, ICM20948_USER_CTRL, ICM20948_I2C_MST_EN); //enable I2C master
     writeRegister8(3, ICM20948_I2C_MST_CTRL, 0x07); // set I2C clock to 345.60 kHz
-    delay(10);
+    HAL_Delay(10);
 }
 
 void ICM20948_WE::enableMagDataRead(uint8_t reg, uint8_t bytes){
     writeRegister8(3, ICM20948_I2C_SLV0_ADDR, AK09916_ADDRESS | AK09916_READ); // read AK09916
     writeRegister8(3, ICM20948_I2C_SLV0_REG, reg); // define AK09916 register to be read
     writeRegister8(3, ICM20948_I2C_SLV0_CTRL, 0x80 | bytes); //enable read | number of byte
-    delay(10);
+    HAL_Delay(10);
 }
   

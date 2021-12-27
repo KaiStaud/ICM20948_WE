@@ -22,14 +22,8 @@
 #ifndef ICM20948_WE_H_
 #define ICM20948_WE_H_
 
-#if (ARDUINO >= 100)
- #include "Arduino.h"
-#else
- #include "WProgram.h"
-#endif
-
-#include <Wire.h>
-
+#include "stm32g4xx_hal.h"
+#include <string>
 #define AK09916_ADDRESS 0x0C
 
 /* Registers ICM20948 USER BANK 0*/
@@ -238,10 +232,10 @@ public:
     
     /* Constructors */
     
-    ICM20948_WE(int addr);
-    ICM20948_WE();
-    ICM20948_WE(TwoWire *w, int addr);
-    ICM20948_WE(TwoWire *w);           
+    //ICM20948_WE(int addr);
+    //ICM20948_WE();
+    ICM20948_WE(I2C_HandleTypeDef *w, int addr);
+    ICM20948_WE(I2C_HandleTypeDef *w);
     
    
    /* Basic settings */
@@ -285,7 +279,7 @@ public:
     
     xyzFloat getAngles();
     ICM20948_orientation getOrientation();
-    String getOrientationAsString();
+    std::string getOrientationAsString();
     float getPitch();
     float getRoll();
     
@@ -332,7 +326,8 @@ public:
     void resetMag();
     
 private:
-    TwoWire *_wire;
+    //TwoWire *_wire;
+    I2C_HandleTypeDef *_wire;
     int i2cAddress;
     uint8_t currentBank;
     uint8_t buffer[20]; 
